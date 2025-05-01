@@ -18,11 +18,29 @@ if (!$data) {
 }
 
 try {
-  // Validate required fields (removed dateReleased validation)
-  if (empty($data['documentType'])) {
+  // Validate required fields
+  $requiredFields = ['documentType', 'receivedBy', 'agency', 'status'];
+  foreach ($requiredFields as $field) {
+    if (empty($data[$field])) {
+      http_response_code(400);
+      echo json_encode(['error' => ucfirst($field) . ' is required']);
+      exit;
+    }
+  }
+
+  // Validate particulars
+  if (empty($data['items'])) {
     http_response_code(400);
-    echo json_encode(['error' => 'Document type is required']);
+    echo json_encode(['error' => 'At least one particular item is required']);
     exit;
+  }
+
+  foreach ($data['items'] as $item) {
+    if (empty($item)) {
+      http_response_code(400);
+      echo json_encode(['error' => 'All particulars must have a description']);
+      exit;
+    }
   }
 
   // Get document type ID from database
@@ -52,18 +70,21 @@ try {
   $sequence = $lastSeq ? $lastSeq + 1 : 1;
   $controlNo = $yearMonth . '-' . str_pad($sequence, 3, '0', STR_PAD_LEFT);
 
-  // Prepare items data
+  // Prepare items data with proper decimal handling
   $items = $data['items'] ?? [];
   $quantities = $data['quantities'] ?? array_fill(0, count($items), 0);
   $amounts = $data['amounts'] ?? array_fill(0, count($items), 0);
 
-  // Calculate total amount
+  // Calculate total amount with decimal precision
   $totalAmount = 0;
   for ($i = 0; $i < count($items); $i++) {
-    $qty = is_numeric($quantities[$i]) ? (float)$quantities[$i] : 0;
+    $qty = is_numeric($quantities[$i]) ? (int)$quantities[$i] : 0;
     $amt = is_numeric($amounts[$i]) ? (float)$amounts[$i] : 0;
     $totalAmount += $qty * $amt;
   }
+
+  // Round to 2 decimal places for storage
+  $totalAmount = round($totalAmount, 2);
 
   // Insert record
   $stmt = $pdo->prepare("
@@ -80,16 +101,16 @@ try {
 
   $success = $stmt->execute([
     ':controlNo' => $controlNo,
-    ':dateReleased' => $dateReleased, // Automatically set current date
+    ':dateReleased' => $dateReleased,
     ':docType' => $docType['id'],
     ':description' => $data['description'] ?? '',
     ':particulars' => json_encode($items),
     ':qty' => json_encode($quantities),
     ':amount' => json_encode($amounts),
     ':totalAmount' => $totalAmount,
-    ':agency' => $data['agency'] ?? '',
-    ':status' => $data['status'] ?? '',
-    ':receivedBy' => $data['receivedBy'] ?? '',
+    ':agency' => $data['agency'],
+    ':status' => $data['status'],
+    ':receivedBy' => $data['receivedBy'],
     ':storageFile' => $data['storageFile'] ?? ''
   ]);
 

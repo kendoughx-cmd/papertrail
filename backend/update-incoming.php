@@ -19,13 +19,30 @@ if (!$data || empty($data['id'])) {
 
 try {
   // Validate required fields
-  $required = ['dateOfAda', 'documentType'];
+  $required = ['dateOfAda', 'documentType', 'agency', 'status'];
+
+  // Document type specific requirements
+  if ($data['documentType'] === 'Disbursement Voucher (ADA)') {
+    $required[] = 'adaNo';
+  } elseif ($data['documentType'] === 'Purchase Order') {
+    $required[] = 'poNo';
+  } elseif ($data['documentType'] === 'Official Receipt') {
+    $required[] = 'orNo';
+  }
+
   foreach ($required as $field) {
     if (empty($data[$field])) {
       http_response_code(400);
       echo json_encode(['error' => "$field is required"]);
       exit;
     }
+  }
+
+  // Validate particulars
+  if (empty($data['items']) || count(array_filter($data['items'])) === 0) {
+    http_response_code(400);
+    echo json_encode(['error' => 'At least one valid particular is required']);
+    exit;
   }
 
   // Get document type ID
@@ -39,40 +56,43 @@ try {
     exit;
   }
 
-  // Prepare data
+  // Prepare data with proper decimal handling
   $items = $data['items'] ?? [];
   $quantities = $data['quantities'] ?? array_fill(0, count($items), 0);
   $amounts = $data['amounts'] ?? array_fill(0, count($items), 0);
 
-  // Calculate total amount
+  // Calculate total amount with decimal precision
   $totalAmount = 0;
   for ($i = 0; $i < count($items); $i++) {
-    $qty = is_numeric($quantities[$i]) ? (float)$quantities[$i] : 0;
+    $qty = is_numeric($quantities[$i]) ? (int)$quantities[$i] : 0;
     $amt = is_numeric($amounts[$i]) ? (float)$amounts[$i] : 0;
     $totalAmount += $qty * $amt;
   }
 
+  // Round to 2 decimal places for storage
+  $totalAmount = round($totalAmount, 2);
+
   // Update record
   $stmt = $pdo->prepare("
-        UPDATE incoming SET
-            dateOfAda = :dateOfAda,
-            document_type = :docType,
-            adaNo = :adaNo,
-            jevNo = :jevNo,
-            orNo = :orNo,
-            poNo = :poNo,
-            description = :description,
-            particulars = :particulars,
-            qty = :qty,
-            amount = :amount,
-            totalAmount = :totalAmount,
-            payee = :payee,
-            natureOfPayment = :natureOfPayment,
-            agency = :agency,
-            status = :status,
-            storageFile = :storageFile
-        WHERE id = :id
-    ");
+    UPDATE incoming SET
+      dateOfAda = :dateOfAda,
+      document_type = :docType,
+      adaNo = :adaNo,
+      jevNo = :jevNo,
+      orNo = :orNo,
+      poNo = :poNo,
+      description = :description,
+      particulars = :particulars,
+      qty = :qty,
+      amount = :amount,
+      totalAmount = :totalAmount,
+      payee = :payee,
+      natureOfPayment = :natureOfPayment,
+      agency = :agency,
+      status = :status,
+      storageFile = :storageFile
+    WHERE id = :id
+  ");
 
   $success = $stmt->execute([
     ':dateOfAda' => $data['dateOfAda'],
@@ -88,8 +108,8 @@ try {
     ':totalAmount' => $totalAmount,
     ':payee' => $data['payee'] ?? null,
     ':natureOfPayment' => $data['natureOfPayment'] ?? null,
-    ':agency' => $data['agency'] ?? null,
-    ':status' => $data['status'] ?? null,
+    ':agency' => $data['agency'],
+    ':status' => $data['status'],
     ':storageFile' => $data['storageFile'] ?? null,
     ':id' => $data['id']
   ]);

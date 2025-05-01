@@ -19,6 +19,36 @@ if (
   $role = $data['role'];
   $address = isset($data['address']) ? $data['address'] : '';
 
+  // Validate required fields
+  $errors = [];
+
+  if (empty($id_number)) {
+    $errors['id_number'] = 'ID Number is required';
+  }
+
+  if (empty($first_name)) {
+    $errors['first_name'] = 'First Name is required';
+  }
+
+  if (empty($last_name)) {
+    $errors['last_name'] = 'Last Name is required';
+  }
+
+  if (empty($email)) {
+    $errors['email'] = 'Email is required';
+  } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    $errors['email'] = 'Invalid email format';
+  }
+
+  if (empty($role)) {
+    $errors['role'] = 'Role is required';
+  }
+
+  if (!empty($errors)) {
+    echo json_encode(['status' => 'error', 'message' => 'Validation failed', 'errors' => $errors]);
+    exit();
+  }
+
   // Check if password is provided (optional for update)
   $password_update = '';
   if (isset($data['password']) && !empty($data['password'])) {
@@ -29,15 +59,15 @@ if (
   try {
     // Prepare the SQL query using PDO
     $sql = "UPDATE users SET 
-                id_number = :id_number, 
-                first_name = :first_name, 
-                middle_name = :middle_name,
-                last_name = :last_name, 
-                email = :email, 
-                role = :role, 
-                address = :address
-                $password_update
-                WHERE id_number = :id_number";
+                    id_number = :id_number, 
+                    first_name = :first_name, 
+                    middle_name = :middle_name,
+                    last_name = :last_name, 
+                    email = :email, 
+                    role = :role, 
+                    address = :address
+                    $password_update
+                    WHERE id_number = :id_number";
 
     $stmt = $pdo->prepare($sql);
 

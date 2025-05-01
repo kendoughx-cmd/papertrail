@@ -10,7 +10,6 @@ if (
   isset($data['id_number']) && isset($data['first_name']) && isset($data['last_name']) &&
   isset($data['email']) && isset($data['password']) && isset($data['role'])
 ) {
-
   // Sanitize inputs
   $id_number = trim($data['id_number']);
   $first_name = trim($data['first_name']);
@@ -75,7 +74,7 @@ if (
 
     // Prepare the SQL query using PDO
     $stmt = $pdo->prepare("INSERT INTO users (id_number, first_name, middle_name, last_name, email, password, role, address) 
-                         VALUES (:id_number, :first_name, :middle_name, :last_name, :email, :password, :role, :address)");
+                             VALUES (:id_number, :first_name, :middle_name, :last_name, :email, :password, :role, :address)");
 
     // Bind the parameters
     $stmt->bindParam(':id_number', $id_number);

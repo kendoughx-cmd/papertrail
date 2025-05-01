@@ -29,6 +29,48 @@ try {
     exit;
   }
 
+  // Validate required fields if they are being updated
+  if (isset($data['documentType']) && empty($data['documentType'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Document type is required']);
+    exit;
+  }
+
+  if (isset($data['receivedBy']) && empty($data['receivedBy'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Received by is required']);
+    exit;
+  }
+
+  if (isset($data['agency']) && empty($data['agency'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Agency is required']);
+    exit;
+  }
+
+  if (isset($data['status']) && empty($data['status'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Status is required']);
+    exit;
+  }
+
+  // Validate particulars if they are being updated
+  if (isset($data['items'])) {
+    if (empty($data['items'])) {
+      http_response_code(400);
+      echo json_encode(['error' => 'At least one particular item is required']);
+      exit;
+    }
+
+    foreach ($data['items'] as $item) {
+      if (empty($item)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'All particulars must have a description']);
+        exit;
+      }
+    }
+  }
+
   // Only update fields that were explicitly provided
   $updateFields = [];
   $params = [':id' => $data['id']];
@@ -90,13 +132,16 @@ try {
     $quantities = $data['quantities'];
     $amounts = $data['amounts'];
 
-    // Calculate total amount
+    // Calculate total amount with decimal precision
     $totalAmount = 0;
     for ($i = 0; $i < count($items); $i++) {
-      $qty = is_numeric($quantities[$i]) ? (float)$quantities[$i] : 0;
+      $qty = is_numeric($quantities[$i]) ? (int)$quantities[$i] : 0;
       $amt = is_numeric($amounts[$i]) ? (float)$amounts[$i] : 0;
       $totalAmount += $qty * $amt;
     }
+
+    // Round to 2 decimal places for storage
+    $totalAmount = round($totalAmount, 2);
 
     $updateFields = array_merge($updateFields, [
       "particulars = :particulars",
@@ -128,8 +173,7 @@ try {
   if ($success) {
     echo json_encode([
       'success' => true,
-      'message' => 'Outgoing document updated successfully',
-      'updatedFields' => array_keys($params) // For debugging
+      'message' => 'Outgoing document updated successfully'
     ]);
   } else {
     throw new PDOException('Update failed');
